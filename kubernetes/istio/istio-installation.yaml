@@ -1,0 +1,29 @@
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  name: istio-control-plane
+  namespace: istio-system
+spec:
+  profile: default
+  components:
+    ingressGateways:
+    - name: istio-ingressgateway
+      enabled: true
+      k8s:
+        service:
+          type: NodePort  # We'll use NodePort since we'll front it with an ALB
+          ports:
+          - port: 80
+            targetPort: 8080
+            name: http
+          - port: 443
+            targetPort: 8443
+            name: https
+        hpaSpec:
+          minReplicas: 2
+          maxReplicas: 5
+  values:
+    global:
+      proxy:
+        autoInject: enabled
+      # useMCP: false

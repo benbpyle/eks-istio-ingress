@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: rust-services
+  labels:
+    app: service-b
+  name: service-b
+spec:
+  selector:
+    matchLabels:
+      app: service-b
+  replicas: 1
+  template:
+    metadata:
+      annotations:
+        traffic.sidecar.istio.io/excludeOutboundPorts: "8126"
+      namespace: rust-services
+      labels:
+        app: service-b
+        sidecar.istio.io/inject: "true"
+    spec:
+      nodeSelector:
+        eks.amazonaws.com/nodegroup: mng-arm
+      containers:
+        - name: service-b
+          image: public.ecr.aws/f8u4w2p3/rust-service-b:2-routes
+          ports:
+            - containerPort: 3000
+              name: http-web-svc
+          env:
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: BIND_ADDRESS
+              value: "0.0.0.0:3000"
+            - name: DD_TRACING_ENABLED
+              value: "false"
+            - name: AGENT_ADDRESS
+              value: $(HOST_IP)
+            - name: RUST_LOG
+              value: "info"
+            - name: SERVICE_A_URL
+              value: http://service-a
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: rust-services
+  labels:
+    app: service-b
+  name: service-b
+spec:
+  selector:
+    app: service-b
+  ports:
+    - name: default
+      protocol: TCP
+      port: 80
+      targetPort: 3000
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: service-b-destination-rule
+  namespace: rust-services
+spec:
+  host: service-b
+  trafficPolicy:
+    outlierDetection:
+      consecutive5xxErrors: 0
+      consecutiveGatewayErrors: 5
+      interval: 15s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 100
+      minHealthPercent: 50

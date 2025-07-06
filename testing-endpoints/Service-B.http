@@ -1,0 +1,7 @@
+### GET HealthCheck
+GET sandbox-alb-1450474442.us-west-2.elb.amazonaws.com/health
+###
+
+### GET Name
+GET sandbox-alb-1450474442.us-west-2.elb.amazonaws.com?name=A Field
+###

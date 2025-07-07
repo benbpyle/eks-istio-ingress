@@ -373,3 +373,138 @@ working with the Service Mesh aspects, so I just get the same feelings. It also 
 problems with these resources. And I can use my normal observability tools like Kiali and Datadog. More on both of 
 those in a future article.
 
+So let's get to configuring the Istio Gateway.
+
+```bash
+kubectl apply -f kubernetes/istio/gateway.yaml
+```
+
+The contents of the `gateway.yaml` file include a `Gateway` resource and a `VirtualService`.  If you've used Istio 
+before, you'll notice most of the VirtualService looks like what you've seen before.  But pay special attention to 
+the gateways section.  This is where I make the connection the Gateway I defined right above it.  And in the Gateway 
+resource, notice that it's in the same namespace as the rest of the application services. `rust-services`.  Those 
+two details tripped me up as I was first working with Istio as an Ingress Gateway.
+
+```yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: application-gateway
+  namespace: rust-services
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*"
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: service-b
+  namespace: rust-services
+spec:
+  hosts:
+    - "*"
+  gateways:
+    - application-gateway
+  http:
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: service-b
+```
+
+## Putting it All Together
+
+What would a walkthrough be without highlighting how to test our work? Being that this is an API focused article, 
+and a simple one at that, I've got a HealthCheck and an actual endpoint to run through.  To make this happen, you'll 
+need the DNS name for the Application Load Balancer you created earlier.  You can grab that from the AWS Console.  
+
+For the HealthCheck:
+
+```bash
+GET http://<ALB URL>/health
+
+HTTP/1.1 200 OK
+Date: Mon, 07 Jul 2025 11:53:17 GMT
+Content-Type: application/json
+Content-Length: 20
+Connection: keep-alive
+x-envoy-upstream-service-time: 1
+server: istio-envoy
+
+{
+  "status": "Healthy"
+}
+Response file saved.
+> 2025-07-07T065317.200.json
+
+Response code: 200 (OK); Time: 184ms (184 ms); Content length: 20 bytes (20 B)
+```
+
+Now let's do the same thing for the actual endpoint>
+
+```bash
+GET http://<ALB URL>>?name=A+Field
+
+HTTP/1.1 200 OK
+Date: Mon, 07 Jul 2025 11:54:47 GMT
+Content-Type: application/json
+Content-Length: 59
+Connection: keep-alive
+x-envoy-upstream-service-time: 3
+server: istio-envoy
+
+{
+  "key_one": "(A Field)Field 1",
+  "key_two": "(A Field)Field 2"
+}
+Response file saved.
+> 2025-07-07T065447.200.json
+
+Response code: 200 (OK); Time: 186ms (186 ms); Content length: 59 bytes (59 B)
+
+```
+
+## Cleaning Up
+
+One thing about working with Kubernetes vs Serverless is that my resources are going to cost me dollars even when 
+I'm not using them.  This is because the EKS control plane is billing hourly and I've allocated two EC2 instances 
+that also are running full time to host my pods.  Being cost conscious is important, so here's how to clean up the 
+resources created above.
+
+```bash
+kubectl delete -f kubernetes/alb/alb-ingress.yaml
+kubectl delete -f kubernetes/istio/gateway.yaml
+kubectl delete -f kubernetes/service/service-b.yaml
+istioctl uninstall --purge
+kubectl delete -f kubernetes/namespaces.yaml
+```
+
+## Wrapping Up
+
+I hope this article gives you the confidence to dive into connection Istio and EKS when building an API Gateway for 
+your APIs.  The Gateway spec offers much more control over the flow of your traffic and is the preferred way going 
+forward in the Kubernetes ecosystem.  However, there's not a ton of documentation out there and I could find little 
+in the way of plain YAML the showed how these pieces come together.  With that said, I barely scratched the surface 
+of the power and flexibility this solution provides.
+
+Kubernetes gets the rap of being complex and difficult to manage but one of the goals of this article was to show 
+that you can achieve a powerful Gateway with very minimal setup and configuration.  I don't believe there's more 
+YAML in this solution than what I write in a Serverless build.  I also don't believe that there are more "parts".  
+I'm just more in control of them.  
+
+The last bit I'll say is that I'd love for you to try out the solution yourself.  Get your hands dirty so to speak 
+and run through the different operations required to make this happen.  Feel free to clone this [GitHub Repository]
+(https://github.com/benbpyle/eks-istio-ingress) and get started.  The README in that repos will help you get going 
+as well.
+
+Thanks for reading and happy building!
+

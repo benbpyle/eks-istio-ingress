@@ -1,6 +1,7 @@
 # Istio Ingress with AWS ALB
 
-This repository contains Kubernetes manifests for setting up Istio with an AWS Application Load Balancer (ALB) and deploying a service from AWS ECR.
+This repository contains Kubernetes manifests for setting up Istio with an AWS Application Load Balancer (ALB) and 
+deploying a service from AWS ECR.  It is further explained and supports the blog article [hosted at this link]()
 
 ## Components
 
@@ -11,9 +12,29 @@ This repository contains Kubernetes manifests for setting up Istio with an AWS A
 
 ## Prerequisites
 
-- AWS CLI configured with appropriate permissions
-- kubectl installed and configured to access your cluster
-- Helm (optional, for Istio installation)
+- AWS CLI (v2.x+) configured with appropriate permissions
+- kubectl (v1.24+) installed and configured to access your cluster
+- Helm (v3.x+) for AWS Load Balancer Controller installation
+- istioctl (v1.18+) for Istio installation and management
+- eksctl (v0.150+) for cluster creation and management
+
+### Installing istioctl
+
+You can install istioctl by following these steps:
+
+```bash
+# Download Istio
+curl -L https://istio.io/downloadIstio | ISTIO_VERSION=1.18.2 sh -
+
+# Move to the Istio package directory
+cd istio-1.18.2
+
+# Add the istioctl client to your path
+export PATH=$PWD/bin:$PATH
+
+# Verify installation
+istioctl version
+```
 
 ## Deployment Instructions
 
@@ -49,6 +70,8 @@ eksctl create iamserviceaccount \
     --override-existing-serviceaccounts \
     --region us-west-2 \
     --approve
+
+# Note: Replace <your-aws-account-id> with your actual AWS account ID
 
 # Install the AWS Load Balancer Controller using Helm
 helm repo add eks https://aws.github.io/x-charts

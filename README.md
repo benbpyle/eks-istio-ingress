@@ -11,28 +11,69 @@ This repository contains Kubernetes manifests for setting up Istio with an AWS A
 
 ## Prerequisites
 
-- Kubernetes cluster running on AWS
-- AWS Load Balancer Controller installed in the cluster
 - AWS CLI configured with appropriate permissions
 - kubectl installed and configured to access your cluster
 - Helm (optional, for Istio installation)
 
 ## Deployment Instructions
 
-### 1. Set up environment variables
+### 1. Create EKS cluster with eksctl
+
+```bash
+# Create the EKS cluster using the configuration file
+eksctl create cluster -f kubernetes/cluster/cluster-config.yaml
+```
+
+This will create a cluster named "sandbox" in the us-west-2 region with 2 m6g.large ARM instances.
+
+### 2. Install AWS Load Balancer Controller (Gateway Controller)
+
+```bash
+# Associate IAM OIDC provider with the cluster
+eksctl utils associate-iam-oidc-provider \
+    --region us-west-2 \
+    --cluster sandbox \
+    --approve
+
+# Create IAM policy for the AWS Load Balancer Controller
+aws iam create-policy \
+    --policy-name AWSLoadBalancerControllerIAMPolicy \
+    --policy-document file://kubernetes/alb/iam-policy.json
+
+# Create IAM service account for the controller
+eksctl create iamserviceaccount \
+    --cluster=sandbox \
+    --namespace=kube-system \
+    --name=aws-load-balancer-controller \
+    --attach-policy-arn=arn:aws:iam::<your-aws-account-id>:policy/AWSLoadBalancerControllerIAMPolicy \
+    --override-existing-serviceaccounts \
+    --region us-west-2 \
+    --approve
+
+# Install the AWS Load Balancer Controller using Helm
+helm repo add eks https://aws.github.io/x-charts
+kubectl apply -k "github.com/aws/eks-charts/stable/aws-load-balancer-controller/crds?ref=master"
+helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+    -n kube-system \
+    --set clusterName=sandbox \
+    --set serviceAccount.create=false \
+    --set serviceAccount.name=aws-load-balancer-controller
+```
+
+### 3. Set up environment variables
 
 ```bash
 export AWS_ACCOUNT_ID=<your-aws-account-id>
 export AWS_REGION=<your-aws-region>
 ```
 
-### 2. Create namespaces
+### 4. Create namespaces
 
 ```bash
 kubectl apply -f kubernetes/namespaces.yaml
 ```
 
-### 3. Install Istio
+### 5. Install Istio
 
 Using istioctl:
 ```bash
@@ -46,25 +87,26 @@ helm install istiod istio/istiod -n istio-system -f <(istioctl profile dump -f k
 helm install istio-ingress istio/gateway -n istio-system
 ```
 
-### 4. Deploy the application service
+### 6. Deploy the application service
 
 ```bash
+envsubst < kubernetes/service/service-a.yaml | kubectl apply -f -
 envsubst < kubernetes/service/service-b.yaml | kubectl apply -f -
 ```
 
-### 5. Configure Istio routing
+### 7. Configure Istio routing
 
 ```bash
 kubectl apply -f kubernetes/istio/gateway.yaml
 ```
 
-### 6. Set up the AWS ALB
+### 8. Set up the AWS ALB
 
 ```bash
-kubectl apply -f kubernet[blog_article.md](../../rust/circuit-breaking/blog_article.md)[blog_article.md](../../rust/circuit-breaking/blog_article.md)es/alb/alb-ingress.yaml
+kubectl apply -f kubernetes/alb/alb-ingress.yaml
 ```
 
-### 7. Verify the deployment
+### 9. Verify the deployment
 
 ```bash
 # Get the ALB URL

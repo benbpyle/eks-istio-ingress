@@ -1,0 +1,12 @@
+---
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: sandbox
+  region: us-west-2
+
+managedNodeGroups:
+  - name: mng-arm
+    instanceType: m6g.large
+    desiredCapacity: 2

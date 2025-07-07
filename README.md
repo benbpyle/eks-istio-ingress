@@ -1,7 +1,7 @@
 # Istio Ingress with AWS ALB
 
 This repository contains Kubernetes manifests for setting up Istio with an AWS Application Load Balancer (ALB) and 
-deploying a service from AWS ECR.  It is further explained and supports the blog article [hosted at this link]()
+deploying a service from AWS ECR.  It is further explained and supports the blog article [hosted at this link](https://binaryheap.com/api-gateway-with-istio-and-eks/)
 
 ## Components
 

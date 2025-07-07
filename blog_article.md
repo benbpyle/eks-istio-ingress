@@ -1,14 +1,6 @@
-Working with Kubernetes opens a world of possibilities in a software project.
-That's one of its biggest appeals to me as a developer. And when building
-with distributed systems, one of the components that often gets added into
-[on benefits of using a service mesh](https://istio.io/latest/about/service-mesh/),
-head over there first. It
-provides a nice overview of the benefits of using a mesh and how it fits
-into a Kubernetes deployment. However, a limitation of a mesh is that it
-deals with east/west traffic. That means service to service communication.  
-But what about that critical north/south traffic? The kind that comes from
-users? Can my mesh provider in [Istio](https://istio.io/) play a role in
-this as well? And how about pairing with with [Amazon's EKS](https://aws.amazon.com/eks/)? Let's dive in!
+Working with Kubernetes opens a world of possibilities in a software project. That's one of its biggest appeals to me as a developer. And when building with distributed systems, one of the components that often gets added into the mix is a service mesh. If you're not familiar with [the benefits of using a service mesh](https://istio.io/latest/about/service-mesh/), head over there first. It provides a nice overview of the benefits of using a mesh and how it fits into a Kubernetes deployment. 
+
+However, a limitation of a mesh is that it deals with east/west traffic. That means service to service communication. But what about that critical north/south traffic? The kind that comes from users? Can my mesh provider in [Istio](https://istio.io/) play a role in this as well? And how about pairing with [Amazon's EKS](https://aws.amazon.com/eks/)? Let's dive in!
 
 ## API Gateway
 
@@ -16,44 +8,26 @@ this as well? And how about pairing with with [Amazon's EKS](https://aws.amazon.
 
 First off, let's define what an API Gateway is in the context of Kubernetes.
 
-An API Gateway acts as a reverse proxy, routing external traffic to your
-internal
-services while providing essential features like authentication, rate limiting,
-and
-request transformation. In Kubernetes environments, it serves as the entry point
-for all external traffic to your cluster's services.
+An API Gateway acts as a reverse proxy, routing external traffic to your internal services while providing essential features like authentication, rate limiting, and request transformation. In Kubernetes environments, it serves as the entry point for all external traffic to your cluster's services.
 
 Here are key reasons to implement an API Gateway in your Kubernetes setup:
 
-- **Traffic Management**: Centralized control over routing, load balancing, and
-  traffic splitting between different service versions
-- **Security**: Consolidated authentication, authorization, and SSL/TLS
-  termination
+- **Traffic Management**: Centralized control over routing, load balancing, and traffic splitting between different service versions
+- **Security**: Consolidated authentication, authorization, and SSL/TLS termination
 - **Monitoring**: Single point for collecting metrics, logging, and tracing data
-- **API Composition**: Ability to aggregate multiple backend services into a
-  single API
+- **API Composition**: Ability to aggregate multiple backend services into a single API
 - **Rate Limiting**: Protection against abuse through request throttling
-- **Protocol Translation**: Converting between different protocols (HTTP/1.1,
-  HTTP/2,
-  gRPC) as needed
+- **Protocol Translation**: Converting between different protocols (HTTP/1.1, HTTP/2, gRPC) as needed
 
 ## Istio Platform Install
 
-All of these parts and pieces are nice, but how do they connect with AWS EKS
-and can I produce a working solution? This walkthrough will be fairly
-in-depth so starting off with the cluster build.
+All of these parts and pieces are nice, but how do they connect with AWS EKS and can I produce a working solution? This walkthrough will be fairly in-depth so starting off with the cluster build.
 
 ### EKS Cluster
 
-Throughout this build, I'm going to favor simplicity in terms of using
-`eksctl`, bare YAML for my Kubernetes resources, and shell scripts where
-needed. This could be taken further with CDK, CloudFormation, Terraform,
-and other tools, but in examples that I tend to get the most out of, unless
-it's around that abstraction purpose, I like to see and do things vanilla.
+Throughout this build, I'm going to favor simplicity in terms of using `eksctl`, bare YAML for my Kubernetes resources, and shell scripts where needed. This could be taken further with CDK, CloudFormation, Terraform, and other tools, but in examples that I tend to get the most out of, unless it's around that abstraction purpose, I like to see and do things vanilla.
 
-If you've cloned the repository // TODO INSERT REPOS and are working from it,
-there's a file call `cluster-config.yaml`. In that file, the cluster's
-configuration as well the node group requirements are defined.
+If you've cloned the repository [https://github.com/benbpyle/eks-istio-ingress](https://github.com/benbpyle/eks-istio-ingress) and are working from it, there's a file call `cluster-config.yaml`. In that file, the cluster's configuration as well the node group requirements are defined.
 
 ```yaml
 ---
@@ -70,21 +44,13 @@ managedNodeGroups:
     desiredCapacity: 2
 ```
 
-When I run `eksctl create cluster -f cluster-config.yaml` everything gets
-going. My VPC is configured, I get some subnets, a nodegroup for my cluster
-to work with as well as a functioning Kubernetes install.
+When I run `eksctl create cluster -f cluster-config.yaml` everything gets going. My VPC is configured, I get some subnets, a nodegroup for my cluster to work with as well as a functioning Kubernetes install.
 
 ### AWS Gateway Controller
 
-With Istio installed, I'm marching my cluster toward allowing ingress
-traffic through my Istio gateway. The next step in the journey is to
-install an AWS Gateway Controller. This gateway controller will launch an
-AWS Load Balancer that can connect the outside world to my cluster. I also
-get a couple of pods that make that connection more physical be bridging the
-cloud load balancer to a resource inside my cluster.
+With Istio installed, I'm marching my cluster toward allowing ingress traffic through my Istio gateway. The next step in the journey is to install an AWS Gateway Controller. This gateway controller will launch an AWS Load Balancer that can connect the outside world to my cluster. I also get a couple of pods that make that connection more physical be bridging the cloud load balancer to a resource inside my cluster.
 
-I've created a shell script that encapsulates some of the tasks that are
-needed to get the controller in my cluster.
+I've created a shell script that encapsulates some of the tasks that are needed to get the controller in my cluster.
 
 ```shell
 # Associate IAM OIDC provider with the cluster
@@ -276,10 +242,7 @@ spec:
 
 ### Deploy Service-B
 
-This service is the receiver of outside traffic (via Istio) and will make calls into
-Service-A and communicate over the service mesh (Istio). An all-Istio  
-managed solution!  Let's have a look at the service first and then see about connecting the new Gateway to this inbound
-traffic handling service. Notice it'll look very much like the Service-A definition above.
+This service is the receiver of outside traffic (via Istio) and will make calls into Service-A and communicate over the service mesh (Istio). An all-Istio managed solution! Let's have a look at the service first and then see about connecting the new Gateway to this inbound traffic handling service. Notice it'll look very much like the Service-A definition above.
 
 ```shell
 kubectl apply -f service-b-service.yaml
@@ -366,12 +329,7 @@ spec:
 
 ### Connecting Service-B to the Gateway
 
-The last 2 pieces of the puzzle include adding the actual Gateway itself and connecting the Gateway to the Application
-Load Balancer defined in AWS. What I really enjoy about using Istio as an Ingress/API Gateway is that I use 
-constructs like VirtualService and HTTPRoute to manage my traffic flow. These are the same resources I use when 
-working with the Service Mesh aspects, so I just get the same feelings. It also means I know how to troubleshoot 
-problems with these resources. And I can use my normal observability tools like Kiali and Datadog. More on both of 
-those in a future article.
+The last 2 pieces of the puzzle include adding the actual Gateway itself and connecting the Gateway to the Application Load Balancer defined in AWS. What I really enjoy about using Istio as an Ingress/API Gateway is that I use constructs like VirtualService and HTTPRoute to manage my traffic flow. These are the same resources I use when working with the Service Mesh aspects, so I just get the same feelings. It also means I know how to troubleshoot problems with these resources. And I can use my normal observability tools like Kiali and Datadog. More on both of those in a future article.
 
 So let's get to configuring the Istio Gateway.
 
@@ -379,11 +337,7 @@ So let's get to configuring the Istio Gateway.
 kubectl apply -f kubernetes/istio/gateway.yaml
 ```
 
-The contents of the `gateway.yaml` file include a `Gateway` resource and a `VirtualService`.  If you've used Istio 
-before, you'll notice most of the VirtualService looks like what you've seen before.  But pay special attention to 
-the gateways section.  This is where I make the connection the Gateway I defined right above it.  And in the Gateway 
-resource, notice that it's in the same namespace as the rest of the application services. `rust-services`.  Those 
-two details tripped me up as I was first working with Istio as an Ingress Gateway.
+The contents of the `gateway.yaml` file include a `Gateway` resource and a `VirtualService`. If you've used Istio before, you'll notice most of the VirtualService looks like what you've seen before. But pay special attention to the gateways section. This is where I make the connection the Gateway I defined right above it. And in the Gateway resource, notice that it's in the same namespace as the rest of the application services. `rust-services`. Those two details tripped me up as I was first working with Istio as an Ingress Gateway.
 
 ```yaml
 apiVersion: networking.istio.io/v1alpha3
@@ -395,12 +349,12 @@ spec:
   selector:
     istio: ingressgateway
   servers:
-  - port:
-      number: 80
-      name: http
-      protocol: HTTP
-    hosts:
-    - "*"
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "*"
 ---
 apiVersion: networking.istio.io/v1
 kind: VirtualService
@@ -423,9 +377,7 @@ spec:
 
 ## Putting it All Together
 
-What would a walkthrough be without highlighting how to test our work? Being that this is an API focused article, 
-and a simple one at that, I've got a HealthCheck and an actual endpoint to run through.  To make this happen, you'll 
-need the DNS name for the Application Load Balancer you created earlier.  You can grab that from the AWS Console.  
+What would a walkthrough be without highlighting how to test our work? Being that this is an API focused article, and a simple one at that, I've got a HealthCheck and an actual endpoint to run through. To make this happen, you'll need the DNS name for the Application Load Balancer you created earlier. You can grab that from the AWS Console.
 
 For the HealthCheck:
 
@@ -475,10 +427,7 @@ Response code: 200 (OK); Time: 186ms (186 ms); Content length: 59 bytes (59 B)
 
 ## Cleaning Up
 
-One thing about working with Kubernetes vs Serverless is that my resources are going to cost me dollars even when 
-I'm not using them.  This is because the EKS control plane is billing hourly and I've allocated two EC2 instances 
-that also are running full time to host my pods.  Being cost conscious is important, so here's how to clean up the 
-resources created above.
+One thing about working with Kubernetes vs Serverless is that my resources are going to cost me dollars even when I'm not using them. This is because the EKS control plane is billing hourly and I've allocated two EC2 instances that also are running full time to host my pods. Being cost conscious is important, so here's how to clean up the resources created above.
 
 ```bash
 kubectl delete -f kubernetes/alb/alb-ingress.yaml
@@ -490,21 +439,10 @@ kubectl delete -f kubernetes/namespaces.yaml
 
 ## Wrapping Up
 
-I hope this article gives you the confidence to dive into connection Istio and EKS when building an API Gateway for 
-your APIs.  The Gateway spec offers much more control over the flow of your traffic and is the preferred way going 
-forward in the Kubernetes ecosystem.  However, there's not a ton of documentation out there and I could find little 
-in the way of plain YAML the showed how these pieces come together.  With that said, I barely scratched the surface 
-of the power and flexibility this solution provides.
+I hope this article gives you the confidence to dive into connection Istio and EKS when building an API Gateway for your APIs. The Gateway spec offers much more control over the flow of your traffic and is the preferred way going forward in the Kubernetes ecosystem. However, there's not a ton of documentation out there and I could find little in the way of plain YAML the showed how these pieces come together. With that said, I barely scratched the surface of the power and flexibility this solution provides.
 
-Kubernetes gets the rap of being complex and difficult to manage but one of the goals of this article was to show 
-that you can achieve a powerful Gateway with very minimal setup and configuration.  I don't believe there's more 
-YAML in this solution than what I write in a Serverless build.  I also don't believe that there are more "parts".  
-I'm just more in control of them.  
+Kubernetes gets the rap of being complex and difficult to manage but one of the goals of this article was to show that you can achieve a powerful Gateway with very minimal setup and configuration. I don't believe there's more YAML in this solution than what I write in a Serverless build. I also don't believe that there are more "parts". I'm just more in control of them.
 
-The last bit I'll say is that I'd love for you to try out the solution yourself.  Get your hands dirty so to speak 
-and run through the different operations required to make this happen.  Feel free to clone this [GitHub Repository]
-(https://github.com/benbpyle/eks-istio-ingress) and get started.  The README in that repos will help you get going 
-as well.
+The last bit I'll say is that I'd love for you to try out the solution yourself. Get your hands dirty so to speak and run through the different operations required to make this happen. Feel free to clone this [GitHub Repository](https://github.com/benbpyle/eks-istio-ingress) and get started. The README in that repos will help you get going as well.
 
 Thanks for reading and happy building!
-
